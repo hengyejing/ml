@@ -11,7 +11,8 @@
 *  PARAMETERS:                                                                       *;
 *   - DATA: INPUT DATA. (REQUIRED)                                                   *;
 *   - Y   : RESPONSE VARIABLE (BAD RESPONSE), 0/1 VALUES ONLY. (REQUIRED)            *;
-*   - XN  : PREDICTORS (INDEPENDENT VARIABLE, REQUIRED)                              *;
+*   - XN  : PREDICTORS (INDEPENDENT VARIABLE, REQUIRED).                             *;
+*                                                                                    *;
 *   - XN_TREND: EXPECTED TREND OF EACH VARIABLE. THE DEFAULT IS NULL, MEANING        *;
 *       THE TREND OF EACH VARIABLE IS DETERMINATED BY DATA. (OPTIONAL)               *;
 *   - WT  : WEIGHTS, DEFAULT WEIGHT IS 1. (OPTIONAL)                                 *;
@@ -43,4 +44,26 @@
 **************************************************************************************;
 
     *** LOCATE THE DATA SOURCE: LIBARY NAME, DATASET NAME AND LIBARY PATH ***;
-    %let lib_data = $
+    %let lib_data = %scan(&data, 1, '.'); /* extract data library name */
+    %let data_name = %scan(&data, 2, '.'); /* extract data name */
+    *** If libname not specified, search the work library path that stores the data ***;
+    %IF "&data_name" = "" %THEN %DO;
+        %let data_name = &lib_data;
+        %let lib_data = in;
+        %let data_path = %sysfunc(pathname(work));
+        %let data = in.&data;
+    %END;
+    %ELSE %let data_path = %sysfunc(pathname(&lib_data));
+
+    %IF "&SV_lkptbl" ne "" %THEN %DO;
+        %let lib_SV = %scan(&SV_lkptbl, 1, '.');
+        %let SV_name = %scan(&SV_lkptbl, 2, '.');
+        %IF "&SV_name" = "" %THEN %DO;
+            %let SV_name = &lib_SV;
+            %let lib_SV = in1;
+            %let SV_path = %sysfunc(pathname(work));
+            %let SV_lkptbl = in1.&SV_lktbl;
+        %END;
+        %ELSE %let SV_path = %sysfunc(pathname(&lib_SV));
+    %END;
+    %ELSE %let SV_path = %sysfunc(pathname(&lib_SV));
