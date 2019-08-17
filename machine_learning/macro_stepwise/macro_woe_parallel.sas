@@ -66,4 +66,4 @@
         %END;
         %ELSE %let SV_path = %sysfunc(pathname(&lib_SV));
     %END;
-    %ELSE %let SV_path = %sysfunc(pathname(&lib_SV));
+    %
