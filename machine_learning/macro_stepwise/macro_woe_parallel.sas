@@ -66,4 +66,65 @@
         %END;
         %ELSE %let SV_path = %sysfunc(pathname(&lib_SV));
     %END;
-    %
+    %IF "RP_lkptbl" ne "" %THEN %DO;
+        %let lib_RP = %scan(&RP_lkptbl, 1, '.');
+        %let RP_name = %scan(&RP_lkptbl, 2, '.');
+        %IF "RP_name" = "" %THEN %DO;
+            %let RP_name = &lib_RP;
+            %let lib_RP = in2;
+            %let RP_path = %sysfunc(pathname(work));
+            %let RP_lkptbl = in2.&RP_lkptbl;
+        %END;
+        %ELSE %let RP_path = %sysfunc(pathname(&lib_RP));
+    %END;
+
+    *** DIVIDE THE VARIABLE LIST INTO N_JOBS LISTS ***;
+    %let numvars = %sysfunc(countw(&xn, ' '));
+    %IF &numvars < &n_jobs %THEN %LET n_jobs = &numvars;
+    %let numvars_1grp = %sysevalf(&numvars/&n_jobs);
+    %let numvars_1grp = %sysfunc(ceil(&numvars_1grp));
+    %PUT THIS IS &numvars_1grp;
+    proc datasets lib = work; delete _varlist; run;
+    %DO i = 1 %TO &numvars;
+        %let xi = %scan(&xn,&i,' ');
+        %IF &xn_trend ne  %THEN %let xi_trd = %scan(&xn_trend, &i, ' ');
+        data _tempA_;
+            length variable &33.;
+            varsID = &i;
+            variable = "&xi";
+            grp = ceil(varsID/&numvars_1grp);
+            if grp > &n_jobs then grp = &n_jobs;
+            %IF &xn_trend ne  %THEN %DO;
+                length trend $5.;
+                trend = "&xi_trd";
+            %END;
+            if varsID = &numvars then call symput("n_jobs", grp);
+        run;
+        proc append data = _tempA_ base = _varlist force; run;
+    %END;
+
+    *** CREATE A TEMPARARY DIRECTORY TO RUN PARALLEL WOE ***;
+    x "mkdir - p &path./WoE_Output";
+    %let temp_woe_path = &path./WoE_Output;
+
+    *** GENERATE N_JOBS SAS FILE FOR PREPARATION OF PARALLEL COMPUTING ***;
+    %let cmd_run_nohup = ;
+    %DO i = 1 %TO &n_jobs;
+        x "rm -f &temp_woe_path./varlist_woe_g&i..dat";
+        data _null_;
+            file "&temp_woe_path./varlist_woe_g&i..dat" mod;
+            set _varlist(where = (grp = &i.)) end = eof;
+            if _N_ = 1 then put '%let ' " xn_g&i = ";
+            put variable;
+            if eof then put ";";
+        run;
+        %IF "&xn_trend" ne "" %THEN %DO;
+            data _null_;
+                file "&temp_woe_path./varlist_woe_g&i..dat" mod;
+                set _varlist(where = (grp = &i.)) end = eof;
+                if _N_ = 1 then put '%let ' " xn_trend_g&i = ";
+                put varsID;
+                if eof then put ";";
+            run;
+        %END;
+
